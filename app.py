@@ -339,7 +339,14 @@ def afficher_donnees():
             )
 
         st.divider()
+        # Utiliser les valeurs envoyées depuis Streamlit
+        # pour actualiser immédiatement l'affichage
 
+        if "commande_succes" in st.session_state and st.session_state.commande_succes:
+
+            temperature = float(st.session_state.temperature_commande)
+            humidite = float(st.session_state.humidite_commande)
+            fumee = float(st.session_state.fumee_commande)
         # ==========================================
         # 8. MESURES ACTUELLES
         # ==========================================
