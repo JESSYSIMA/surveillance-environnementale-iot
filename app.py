@@ -54,7 +54,7 @@ st.sidebar.caption("Région : us-east-1")
 # 3. CONNEXION AWS
 # ==========================================
 
-@st.cache_resource
+
 def connexion_dynamodb():
     dynamodb = boto3.resource(
         "dynamodb",
