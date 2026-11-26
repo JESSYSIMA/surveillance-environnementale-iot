@@ -160,72 +160,79 @@ def envoyer_commande(temperature, humidity, smoke):
         return False, str(erreur)
 
 
+
 # ==========================================
-# 4. INTERFACE DE CONTROLE
+# 4. CONTROLE AUTOMATIQUE DES CAPTEURS
 # ==========================================
+
+def commande_automatique():
+
+    succes, message = envoyer_commande(
+        st.session_state.temperature_commande,
+        st.session_state.humidite_commande,
+        st.session_state.fumee_commande
+    )
+
+    st.session_state.commande_succes = succes
+    st.session_state.commande_message = message
+
 
 st.divider()
 st.subheader("🎛️ Contrôle à distance de l'ESP32")
 
 st.info(
-    "Modifie les valeurs des capteurs simulés "
-    "et envoie les commandes directement à ton ESP32 via AWS IoT Core."
+    "Modifie les curseurs : les nouvelles valeurs "
+    "seront automatiquement envoyées à l'ESP32."
 )
 
-with st.form("formulaire_commandes"):
+col1, col2, col3 = st.columns(3)
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        temperature_commande = st.slider(
-            "🌡️ Température (°C)",
-            min_value=-10,
-            max_value=60,
-            value=25
-        )
-
-    with col2:
-        humidite_commande = st.slider(
-            "💧 Humidité (%)",
-            min_value=0,
-            max_value=100,
-            value=60
-        )
-
-    with col3:
-        fumee_commande = st.slider(
-            "💨 Fumée MQ-2 (ADC)",
-            min_value=0,
-            max_value=4095,
-            value=1200
-        )
-
-    envoyer = st.form_submit_button(
-        "🚀 Envoyer les commandes à l'ESP32",
-        use_container_width=True
+with col1:
+    st.slider(
+        "🌡️ Température (°C)",
+        min_value=-10,
+        max_value=60,
+        value=25,
+        key="temperature_commande",
+        on_change=commande_automatique
     )
 
-if envoyer:
+with col2:
+    st.slider(
+        "💧 Humidité (%)",
+        min_value=0,
+        max_value=100,
+        value=60,
+        key="humidite_commande",
+        on_change=commande_automatique
+    )
 
-    with st.spinner("Envoi des commandes vers AWS IoT Core..."):
+with col3:
+    st.slider(
+        "💨 Fumée MQ-2 (ADC)",
+        min_value=0,
+        max_value=4095,
+        value=1200,
+        key="fumee_commande",
+        on_change=commande_automatique
+    )
 
-        succes, message = envoyer_commande(
-            temperature_commande,
-            humidite_commande,
-            fumee_commande
-        )
 
-    if succes:
-        st.success(message)
-        st.write("Valeurs envoyées :")
-        st.json({
-            "temperature": temperature_commande,
-            "humidity": humidite_commande,
-            "smoke": fumee_commande
-        })
+if "commande_succes" in st.session_state:
+
+    if st.session_state.commande_succes:
+        st.success(st.session_state.commande_message)
     else:
-        st.error("Erreur lors de l'envoi de la commande.")
-        st.code(message)
+        st.error(st.session_state.commande_message)
+
+    st.caption("Dernières valeurs envoyées :")
+
+    st.json({
+        "temperature": st.session_state.temperature_commande,
+        "humidity": st.session_state.humidite_commande,
+        "smoke": st.session_state.fumee_commande
+    })
+
 
 
 # ==========================================
