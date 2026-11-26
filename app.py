@@ -4,6 +4,10 @@ import pandas as pd
 import boto3
 from boto3.dynamodb.conditions import Key
 from datetime import datetime
+import json
+import ssl
+import tempfile
+import paho.mqtt.client as mqtt
 
 # ==========================================
 # 1. CONFIGURATION
