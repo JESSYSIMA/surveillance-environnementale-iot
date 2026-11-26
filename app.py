@@ -6,6 +6,8 @@ import ssl
 import tempfile
 import threading
 import paho.mqtt.client as mqtt
+import time
+
 
 from boto3.dynamodb.conditions import Key
 from datetime import datetime
@@ -15,12 +17,16 @@ from datetime import datetime
 # ==========================================
 
 st.set_page_config(
-    page_title="Surveillance Environnementale",
+    page_title="Surveillance environnementale",
     page_icon="🌍",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
-
+st.markdown(
+    """
+    <meta http-equiv="refresh" content="5">
+    """,
+    unsafe_allow_html=True
+)
 st.title("🌍 Surveillance environnementale")
 st.caption("Plateforme IoT de surveillance en temps réel | ESP32 • AWS")
 
