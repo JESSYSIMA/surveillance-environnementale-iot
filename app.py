@@ -54,7 +54,7 @@ st.sidebar.caption("Région : us-east-1")
 st.sidebar.caption("Actualisation automatique : 5 secondes")
 
 # ==========================================
-# 3. CONTROLE DES CAPTEURS VIA MQTT
+# 3. ENVOI DES COMMANDES MQTT
 # ==========================================
 
 def envoyer_commande(temperature, humidity, smoke):
@@ -151,7 +151,7 @@ def envoyer_commande(temperature, humidity, smoke):
                         "La publication MQTT n'a pas été confirmée."
                     )
 
-                return True, "Commande envoyée avec succès !"
+                return True, "Commande MQTT publiée avec succès !"
 
             finally:
 
@@ -229,7 +229,7 @@ if "commande_succes" in st.session_state:
     else:
         st.error(st.session_state.commande_message)
 
-    st.caption("Dernières valeurs envoyées :")
+    st.caption("Dernières valeurs demandées à l'ESP32 :")
 
     st.json({
         "temperature": st.session_state.temperature_commande,
@@ -256,7 +256,7 @@ def connexion_dynamodb():
 
 
 # ==========================================
-# 6. ACTUALISATION AUTOMATIQUE DES DONNEES
+# 6. ACTUALISATION AUTOMATIQUE
 # ==========================================
 
 @st.fragment(run_every="5s")
@@ -317,6 +317,7 @@ def afficher_donnees():
 
         derniere = donnees.iloc[-1]
 
+        # Mesures réellement reçues depuis l'ESP32
         temperature = float(derniere["temperature"])
         humidite = float(derniere["humidity"])
         fumee = float(derniere["smoke"])
@@ -332,21 +333,14 @@ def afficher_donnees():
 
         with col_b:
             st.caption(
-                "Dernière mesure : "
+                "Dernière mesure reçue : "
                 + derniere["date"].strftime(
                     "%d/%m/%Y %H:%M:%S"
                 )
             )
 
         st.divider()
-        # Utiliser les valeurs envoyées depuis Streamlit
-        # pour actualiser immédiatement l'affichage
 
-        if "commande_succes" in st.session_state and st.session_state.commande_succes:
-
-            temperature = float(st.session_state.temperature_commande)
-            humidite = float(st.session_state.humidite_commande)
-            fumee = float(st.session_state.fumee_commande)
         # ==========================================
         # 8. MESURES ACTUELLES
         # ==========================================
