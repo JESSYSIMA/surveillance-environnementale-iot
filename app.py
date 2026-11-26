@@ -1,76 +1,147 @@
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+import boto3
+from boto3.dynamodb.conditions import Key
+from datetime import datetime
 
-# Configuration de la page
 st.set_page_config(
     page_title="Surveillance environnementale",
     page_icon="🌍",
     layout="wide"
 )
 
-# Titre
 st.title("🌍 Surveillance environnementale")
 st.write("Tableau de bord IoT — ESP32 et AWS")
-
-st.info("Mode démonstration : les valeurs affichées sont fictives. La connexion aux données AWS sera ajoutée ensuite.")
 
 # Paramètres
 st.sidebar.title("⚙️ Paramètres")
 seuil_fumee = st.sidebar.slider(
-    "Seuil d'alerte fumée (valeur brute MQ-2)",
-    min_value=500,
-    max_value=4095,
-    value=3000
+    "Seuil d'alerte fumée (MQ-2)",
+    500, 4095, 3000
 )
 
 st.sidebar.write("Appareil : ESP32")
-st.sidebar.write("Statut : Simulation")
+st.sidebar.write("Source : AWS DynamoDB")
 
-# Données de démonstration
-donnees = pd.DataFrame({
-    "Heure": [datetime.now() - timedelta(minutes=5*i) for i in range(11, -1, -1)],
-    "Température (°C)": [22, 22.5, 23, 23.5, 24, 24.5, 25, 25.2, 25.5, 26, 25.8, 25.5],
-    "Humidité (%)": [55, 54, 53, 52, 50, 49, 48, 47, 46, 45, 46, 47],
-    "Fumée (ADC)": [900, 950, 1000, 1100, 1200, 1300, 1500, 1600, 1800, 1900, 2000, 2100]
-})
+if st.sidebar.button("🔄 Actualiser les mesures"):
+    st.rerun()
 
-# Dernières mesures
-temperature = donnees["Température (°C)"].iloc[-1]
-humidite = donnees["Humidité (%)"].iloc[-1]
-fumee = donnees["Fumée (ADC)"].iloc[-1]
+# Connexion AWS DynamoDB
+@st.cache_resource
+def connexion_dynamodb():
+    dynamodb = boto3.resource(
+        "dynamodb",
+        region_name=st.secrets["AWS_DEFAULT_REGION"],
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
+        aws_session_token=st.secrets["AWS_SESSION_TOKEN"]
+    )
+    return dynamodb.Table("SurveillanceData")
 
-st.subheader("📊 Mesures actuelles")
+try:
+    table = connexion_dynamodb()
 
-col1, col2, col3 = st.columns(3)
+    reponse = table.query(
+        KeyConditionExpression=Key("deviceId").eq(
+            "ESP32_Surveillance_Environnementale"
+        ),
+        ScanIndexForward=False,
+        Limit=100
+    )
 
-col1.metric("🌡️ Température", f"{temperature} °C")
-col2.metric("💧 Humidité", f"{humidite} %")
-col3.metric("💨 Fumée (MQ-2)", f"{fumee}")
+    elements = reponse.get("Items", [])
 
-# État du système
-st.subheader("🚨 État du système")
+    if not elements:
+        st.warning("Aucune mesure trouvée pour cet appareil dans DynamoDB.")
+        st.stop()
 
-if fumee > seuil_fumee:
-    st.error("ALERTE : seuil de fumée dépassé !")
-else:
-    st.success("Système normal — aucun dépassement du seuil.")
+    donnees = pd.DataFrame(elements)
 
-# Graphiques
-st.subheader("📈 Évolution des mesures")
+    donnees["time"] = pd.to_numeric(donnees["time"])
+    donnees["temperature"] = pd.to_numeric(donnees["temperature"])
+    donnees["humidity"] = pd.to_numeric(donnees["humidity"])
+    donnees["smoke"] = pd.to_numeric(donnees["smoke"])
 
-st.write("Température")
-st.line_chart(donnees.set_index("Heure")["Température (°C)"])
+    # Conversion des timestamps en dates
+    donnees["date"] = donnees["time"].apply(
+        lambda x: datetime.fromtimestamp(
+            x / 1000 if x > 100000000000 else x
+        )
+    )
 
-st.write("Humidité")
-st.line_chart(donnees.set_index("Heure")["Humidité (%)"])
+    donnees = donnees.sort_values("date")
 
-st.write("Fumée — valeur brute du capteur MQ-2")
-st.line_chart(donnees.set_index("Heure")["Fumée (ADC)"])
+    derniere = donnees.iloc[-1]
 
-# Historique
-st.subheader("📋 Historique des mesures")
-st.dataframe(donnees.sort_values("Heure", ascending=False), use_container_width=True)
+    st.success("Connexion à DynamoDB réussie !")
 
-st.caption("Projet IoT — ESP32 | AWS IoT Core | DynamoDB | CloudWatch")
+    # Mesures actuelles
+    st.subheader("📊 Mesures actuelles")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "🌡️ Température",
+        f"{derniere['temperature']:.1f} °C"
+    )
+
+    col2.metric(
+        "💧 Humidité",
+        f"{derniere['humidity']:.1f} %"
+    )
+
+    col3.metric(
+        "💨 Fumée (MQ-2)",
+        f"{derniere['smoke']:.0f}"
+    )
+
+    # Alertes
+    st.subheader("🚨 État du système")
+
+    if derniere["smoke"] > seuil_fumee:
+        st.error("ALERTE : seuil de fumée dépassé !")
+    else:
+        st.success("Système normal — aucun dépassement du seuil.")
+
+    # Graphiques
+    st.subheader("📈 Évolution des mesures")
+
+    graphique = donnees.set_index("date")
+
+    st.write("Température")
+    st.line_chart(graphique["temperature"])
+
+    st.write("Humidité")
+    st.line_chart(graphique["humidity"])
+
+    st.write("Fumée — valeur brute du MQ-2")
+    st.line_chart(graphique["smoke"])
+
+    # Historique
+    st.subheader("📋 Historique des mesures")
+
+    historique = donnees[
+        ["date", "temperature", "humidity", "smoke"]
+    ].sort_values("date", ascending=False)
+
+    historique.columns = [
+        "Date et heure",
+        "Température (°C)",
+        "Humidité (%)",
+        "Fumée (ADC)"
+    ]
+
+    st.dataframe(historique, width="stretch")
+
+    st.caption(
+        "ESP32 | AWS IoT Core | DynamoDB | CloudWatch"
+    )
+
+except Exception as erreur:
+    st.error("Impossible de récupérer les données AWS.")
+    st.write("Détail de l'erreur :", str(erreur))
+    st.info(
+        "Vérifie que le Learner Lab est actif "
+        "et que les identifiants AWS temporaires sont encore valides."
+    )
