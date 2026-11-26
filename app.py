@@ -99,10 +99,10 @@ try:
     # Alertes
     st.subheader("🚨 État du système")
 
-    if derniere["smoke"] > seuil_fumee:
-        st.error("ALERTE : seuil de fumée dépassé !")
+    if derniere["smoke"] >= seuil_fumee:
+        st.error("🚨 ALERTE : niveau de fumée élevé !")
     else:
-        st.success("Système normal — aucun dépassement du seuil.")
+        st.success("✅ Système normal — aucun dépassement du seuil.")
 
     # Graphiques
     st.subheader("📈 Évolution des mesures")
